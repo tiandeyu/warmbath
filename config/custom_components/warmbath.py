@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import threading
 import voluptuous as vol
 import homeassistant.loader as loader
 import homeassistant.helpers.config_validation as cv
@@ -56,7 +57,7 @@ class WarmbathFan(FanEntity):
         self._name = name
         self._mqtt_topic = mqtt_topic
         self._payload = payload
-        self._speed = default_speed
+        self._speed = STATE_OFF
         self._default_speed = default_speed
         self._speed_list = speed_list
 
@@ -95,12 +96,26 @@ class WarmbathFan(FanEntity):
         """Set the speed of the fan."""
         _LOGGER.debug("Set speed: %s" % speed)
         self._speed = speed
-        self.send_ir()
+        yield from self.async_send_ir()
         self.async_schedule_update_ha_state()
 
+    timer = None
 
-    def send_ir(self):
+    @asyncio.coroutine
+    def async_send_ir(self):
         mqtt = loader.get_component(self.hass, 'mqtt')
         payload =  self._payload[self._speed]
         mqtt.publish(self.hass, self._mqtt_topic, payload)
+        """auto close in 15mins when turn on."""
+        if self._speed != STATE_OFF:
+            if self.timer is not None:
+                if self.timer.is_alive():
+                    self.timer.cancel()
+            self.timer = threading.Timer(60*15, self.auto_turn_off)
+            self.timer.start()
 
+    def auto_turn_off(self) -> None:
+        _LOGGER.debug("auto turn off warmbath in 15 mins")
+        self.hass.states.set(self.entity_id, STATE_OFF)
+        self._speed = STATE_OFF
+        self.async_schedule_update_ha_state()
