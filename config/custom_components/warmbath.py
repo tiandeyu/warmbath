@@ -3,15 +3,14 @@ import asyncio
 import voluptuous as vol
 import homeassistant.loader as loader
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.event import track_state_change
-from homeassistant.components.fan import (FanEntity, PLATFORM_SCHEMA,
-                                          SUPPORT_SET_SPEED, DOMAIN, )
-from homeassistant.const import (STATE_OFF, CONF_NAME, CONF_HOST, CONF_MAC, CONF_TIMEOUT, CONF_CUSTOMIZE)
+from homeassistant.components.fan import (FanEntity, PLATFORM_SCHEMA, DOMAIN, )
+from homeassistant.const import (STATE_ON, STATE_OFF, CONF_NAME, )
 
 _LOGGER = logging.getLogger(__name__)
 
 DEPENDENCIES = ['mqtt']
 
+CONFIG_DEFAULT_SPEED = 'default'
 CONFIG_TOPIC = 'command_topic'
 CONFIG_PAYLOAD_CLOSE = 'payload_close'
 CONFIG_PAYLOAD_HEAT = 'payload_heat'
@@ -19,8 +18,12 @@ CONFIG_PAYLOAD_VENTILATE = 'payload_ventilate'
 CONFIG_PAYLOAD_COOL = 'payload_cool'
 CONFIG_PAYLOAD_DRY = 'payload_dry'
 
+DEFAULT_SPEED = 'Heat'
+SPEED_LIST = ['Heat', 'Ventilate', 'Cool', 'Dry']
+
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_NAME): cv.string,
+    vol.Optional(CONFIG_DEFAULT_SPEED, default=DEFAULT_SPEED): cv.string,
     vol.Required(CONFIG_TOPIC): cv.string,
     vol.Required(CONFIG_PAYLOAD_CLOSE): cv.string,
     vol.Required(CONFIG_PAYLOAD_HEAT): cv.string,
@@ -31,46 +34,31 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 
 
 def setup_platform(hass, config, add_devices_callback, discovery_info=None):
+
     name = config.get(CONF_NAME)
-
-#    hass.states.set('fan.warmbath', 'close')
-
-    mqtt = loader.get_component(hass, 'mqtt')
-
-    def state_changed(entity_id, old_state, new_state):
-
-        if old_state is None or new_state is None:
-            return
-        _LOGGER.error('entity_id %s', entity_id)
-        _LOGGER.error('old_state %s', old_state)
-        _LOGGER.error('new_state %s', new_state)
-        if old_state.state != new_state.state:
-            payload = ''
-            if new_state.state == 'close':
-                payload = config[DOMAIN][CONFIG_PAYLOAD_CLOSE]
-            if new_state.state == 'heat':
-                payload = config[DOMAIN][CONFIG_PAYLOAD_HEAT]
-            if new_state.state == 'ventilate':
-                payload = config[DOMAIN][CONFIG_PAYLOAD_VENTILATE]
-            if new_state.state == 'cool':
-                payload = config[DOMAIN][CONFIG_PAYLOAD_COOL]
-            if new_state.state == 'dry':
-                payload = config[DOMAIN][CONFIG_PAYLOAD_DRY]
-            mqtt.publish(hass, config[DOMAIN][CONFIG_TOPIC], payload)
-
-    track_state_change(hass, ['fan.warmbath'], state_changed)
+    mqtt_topic = config.get(CONFIG_TOPIC)
+    default_speed = config.get(CONFIG_DEFAULT_SPEED)
+    payload = {}
+    payload['off'] = config.get(CONFIG_PAYLOAD_CLOSE)
+    payload['Heat'] = config.get(CONFIG_PAYLOAD_HEAT)
+    payload['Ventilate'] = config.get(CONFIG_PAYLOAD_VENTILATE)
+    payload['Cool'] = config.get(CONFIG_PAYLOAD_COOL)
+    payload['Dry'] = config.get(CONFIG_PAYLOAD_DRY)
 
     add_devices_callback([
-        WarmbathFan(hass, 'warmbath')
+        WarmbathFan(name, mqtt_topic, payload, default_speed, SPEED_LIST)
     ])
 
 
 class WarmbathFan(FanEntity):
-    def __init__(self, hass, name):
+    def __init__(self, name, mqtt_topic, payload, default_speed, speed_list):
         """Initialize the generic Xiaomi device."""
         self._name = name
-        self._speed = 'ventilate'
-        self._default_speed = 'ventilate'
+        self._mqtt_topic = mqtt_topic
+        self._payload = payload
+        self._speed = default_speed
+        self._default_speed = default_speed
+        self._speed_list = speed_list
 
     @property
     def name(self):
@@ -78,14 +66,14 @@ class WarmbathFan(FanEntity):
         return self._name
 
     @property
-    def supported_features(self):
+    def speed(self):
         """Flag supported features."""
-        return SUPPORT_SET_SPEED
+        return self._speed
 
     @property
     def speed_list(self) -> list:
         """Get the list of available speeds."""
-        return ['heat', 'ventilate', 'cool', 'dry']
+        return self._speed_list
 
     @asyncio.coroutine
     def async_turn_on(self, speed: str=None) -> None:
@@ -100,7 +88,6 @@ class WarmbathFan(FanEntity):
     def async_turn_off(self) -> None:
         """Turn off the entity."""
         _LOGGER.debug("Turn off")
-        #self.oscillate(False)
         yield from self.async_set_speed(STATE_OFF)
 
     @asyncio.coroutine
@@ -108,11 +95,12 @@ class WarmbathFan(FanEntity):
         """Set the speed of the fan."""
         _LOGGER.debug("Set speed: %s" % speed)
         self._speed = speed
-        yield from self.async_send_ir_after_delay()
+        self.send_ir()
         self.async_schedule_update_ha_state()
 
-    @asyncio.coroutine
-    def async_send_ir_after_delay(self):
-        _LOGGER.error("speed %s", self._speed)
 
+    def send_ir(self):
+        mqtt = loader.get_component(self.hass, 'mqtt')
+        payload =  self._payload[self._speed]
+        mqtt.publish(self.hass, self._mqtt_topic, payload)
 
