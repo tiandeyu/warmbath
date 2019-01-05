@@ -1,4 +1,4 @@
-#warmbath
+###warmbath
 warmbath是一个松下风暖浴霸的homeassistant插件，能够更好的让浴霸通过红外的方式接入homeassistant
 
 Home Assistant Custom Component for Panasonic Bathroom Master
