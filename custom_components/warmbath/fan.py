@@ -2,14 +2,12 @@ import logging
 import asyncio
 import threading
 import voluptuous as vol
-import homeassistant.loader as loader
 import homeassistant.helpers.config_validation as cv
+import homeassistant.components.mqtt as mqtt
 from homeassistant.components.fan import (FanEntity, PLATFORM_SCHEMA, DOMAIN, )
 from homeassistant.const import (STATE_ON, STATE_OFF, CONF_NAME, )
 
 _LOGGER = logging.getLogger(__name__)
-
-DEPENDENCIES = ['mqtt']
 
 CONFIG_DEFAULT_SPEED = 'default'
 CONFIG_TOPIC = 'command_topic'
@@ -103,7 +101,6 @@ class WarmbathFan(FanEntity):
 
     @asyncio.coroutine
     def async_send_ir(self):
-        mqtt = loader.get_component(self.hass, 'mqtt')
         payload =  self._payload[self._speed]
         mqtt.publish(self.hass, self._mqtt_topic, payload)
         """auto close in 15mins when turn on."""

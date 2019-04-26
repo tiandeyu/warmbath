@@ -1,0 +1,8 @@
+{
+  "domain": "warmbath",
+  "name": "Bathroom Master",
+  "documentation": "https://www.natic.cn",
+  "dependencies": [],
+  "codeowners": ["@natic"],
+  "requirements": []
+}
