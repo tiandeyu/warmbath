@@ -4,7 +4,7 @@ import threading
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 import homeassistant.components.mqtt as mqtt
-from homeassistant.components.fan import (FanEntity, PLATFORM_SCHEMA, DOMAIN, )
+from homeassistant.components.fan import (FanEntity, PLATFORM_SCHEMA, DOMAIN, SUPPORT_SET_SPEED, )
 from homeassistant.const import (STATE_ON, STATE_OFF, CONF_NAME, )
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +60,11 @@ class WarmbathFan(FanEntity):
         self._speed_list = speed_list
 
     @property
+    def supported_features(self):
+        """Flag supported features."""
+        return SUPPORT_SET_SPEED
+
+    @property
     def name(self):
         """Return the name of the device if any."""
         return self._name
@@ -92,6 +97,8 @@ class WarmbathFan(FanEntity):
     @asyncio.coroutine
     def async_set_speed(self, speed: str) -> None:
         """Set the speed of the fan."""
+        if self.supported_features & SUPPORT_SET_SPEED == 0:
+            return
         _LOGGER.debug("Set speed: %s" % speed)
         self._speed = speed
         yield from self.async_send_ir()
