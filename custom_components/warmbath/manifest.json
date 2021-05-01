@@ -1,6 +1,7 @@
 {
   "domain": "warmbath",
   "name": "Bathroom Master",
+  "version": "2021.5.1",
   "documentation": "https://www.natic.cn",
   "dependencies": [],
   "codeowners": ["@natic"],
