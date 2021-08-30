@@ -137,6 +137,7 @@ class WarmbathFan(SelectEntity):
 
     def device_state_changed_listener(self, entity_id, from_s, to_s):
         self._attr_current_option = self._state_map.get(entity_id)
+        self.async_write_ha_state()
         self.count_down()
 
     def count_down(self) -> None:
@@ -147,3 +148,4 @@ class WarmbathFan(SelectEntity):
     def auto_turn_off(self) -> None:
         _LOGGER.debug("auto turn off warmbath in 15 mins")
         self._attr_current_option = DEFAULT_OPTION
+        self.async_write_ha_state()
