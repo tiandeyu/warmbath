@@ -38,6 +38,7 @@ CONFIG_SENSOR_DRY = 'sensor_dry'
 
 DEFAULT_OPTION = 'Off'
 OPTIONS = ['Off', 'Heat', 'Ventilate', 'Cool', 'Dry']
+ICON = 'mdi:fan'
 
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
@@ -103,6 +104,11 @@ class WarmbathFan(SelectEntity):
     def should_poll(self):
         """Poll the device."""
         return True
+
+    @property
+    def icon(self):
+        """Return the icon for device by its type."""
+        return ICON
 
     @property
     def name(self):
